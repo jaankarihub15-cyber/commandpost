@@ -315,6 +315,42 @@ function Dashboard() {
   const deleteSource = (id) => setSources(prev => prev.filter(s => s.id !== id));
   const activeProj = projects.find(p => p.id === activeProject);
 
+  // ── Backup: Export ──
+  const exportBackup = () => {
+    const data = { projects, tasks, sources, exportedAt: new Date().toISOString(), version: 1 };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const date = new Date().toISOString().slice(0, 10);
+    a.href = url; a.download = `commandpost-backup-${date}.json`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ── Backup: Import ──
+  const importBackup = () => {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.json';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (!data.projects || !data.tasks) { alert('Invalid backup file.'); return; }
+          if (!confirm(`This will replace all current data with the backup from ${new Date(data.exportedAt).toLocaleDateString()}.\n\n${data.projects.length} projects, ${data.tasks.length} tasks, ${(data.sources || []).length} sources.\n\nContinue?`)) return;
+          setProjects(data.projects);
+          setTasks(data.tasks);
+          setSources(data.sources || []);
+          setActiveProject(null);
+          alert('Backup restored successfully!');
+        } catch { alert('Could not read backup file. Make sure it\'s a valid CommandPost backup.'); }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
   return (
     <>
       <style>{css}</style>
@@ -323,6 +359,8 @@ function Dashboard() {
           <div className="logo" style={{ cursor: "pointer" }} onClick={() => setActiveProject(null)}>CommandPost<span className="logo-dot" style={{ background: activeProj?.color || "#1c1917" }} /></div>
           {activeProj && <button className="pd-back" onClick={() => setActiveProject(null)}>{I.back} All Projects</button>}
           <div className="topbar-right">
+            <button className="btn btn-g btn-sm" onClick={exportBackup} title="Export backup">↓ Backup</button>
+            <button className="btn btn-g btn-sm" onClick={importBackup} title="Import backup">↑ Restore</button>
             {!activeProject && <button className="btn btn-p btn-sm" onClick={() => setShowNewProject(true)}>{I.plus} New Project</button>}
           </div>
         </header>
