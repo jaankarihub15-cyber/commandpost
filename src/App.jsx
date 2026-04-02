@@ -224,8 +224,72 @@ const I = {
   check: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
 };
 
+// ━━━ PASSWORD GATE ━━━
+// Default password: commandpost123
+// To change: run in browser console: 
+//   crypto.subtle.digest('SHA-256', new TextEncoder().encode('YOUR_NEW_PASSWORD')).then(b => console.log(Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('')))
+// Then replace the hash below
+const PASS_HASH = "3eb9aaf176748ab01edd3ad9ca95e67899f1ab9a58540c7dc0d73b768f2f2fa7";
+
+async function hashPassword(pw) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(x => x.toString(16).padStart(2, '0')).join('');
+}
+
+function AuthGate({ children }) {
+  const [authed, setAuthed] = useState(() => sessionStorage.getItem('cp_auth') === '1');
+  const [pw, setPw] = useState('');
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(false);
+    const hash = await hashPassword(pw);
+    if (hash === PASS_HASH) {
+      sessionStorage.setItem('cp_auth', '1');
+      setAuthed(true);
+    } else {
+      setError(true);
+      setPw('');
+    }
+    setLoading(false);
+  };
+
+  if (authed) return children;
+
+  return (
+    <>
+      <style>{css}</style>
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ background: 'var(--surface)', borderRadius: 'var(--rl)', boxShadow: 'var(--shadow-l)', padding: 40, width: 380, maxWidth: '90vw', textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--fd)', fontSize: 24, fontWeight: 600, marginBottom: 6 }}>CommandPost</div>
+          <p style={{ font: '400 13px/1.4 var(--font)', color: 'var(--t3)', marginBottom: 28 }}>Enter password to continue</p>
+          <div onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <input
+              className="fi"
+              type="password"
+              placeholder="Password"
+              value={pw}
+              onChange={e => { setPw(e.target.value); setError(false); }}
+              onKeyDown={e => { if (e.key === 'Enter') handleLogin(e); }}
+              autoFocus
+              style={{ textAlign: 'center', fontSize: 15 }}
+            />
+            {error && <div style={{ font: '400 12px/1 var(--font)', color: '#dc2626' }}>Incorrect password</div>}
+            <button className="btn btn-p" onClick={handleLogin} disabled={loading || !pw.trim()} style={{ width: '100%', justifyContent: 'center', padding: 11 }}>
+              {loading ? 'Verifying...' : 'Unlock'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ━━━ MAIN APP ━━━
-export default function App() {
+function Dashboard() {
   const [projects, setProjects] = useStorage("cp_projects", []);
   const [tasks, setTasks] = useStorage("cp_tasks", []);
   const [sources, setSources] = useStorage("cp_sources", []);
@@ -689,4 +753,9 @@ function TaskModal({ modal, projects, activeProject, onSave, onDelete, onClose }
       </div>
     </div>
   );
+}
+
+// ━━━ EXPORT WITH AUTH ━━━
+export default function App() {
+  return <AuthGate><Dashboard /></AuthGate>;
 }
