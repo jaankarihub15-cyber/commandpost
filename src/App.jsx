@@ -204,6 +204,40 @@ select.fi{appearance:none;cursor:pointer;padding-right:30px;background-image:url
 .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--t3)}
 .empty-icon{font-size:44px;margin-bottom:16px;opacity:.25}
 .empty-txt{font:400 14px/1.5 var(--font);text-align:center;max-width:320px}
+/* ── Notes ── */
+.notes-list{display:flex;flex-direction:column;gap:10px}
+.note-card{background:var(--s2);border-radius:var(--r);padding:14px;transition:var(--tr);border:1px solid transparent}
+.note-card:hover{border-color:var(--border);box-shadow:var(--shadow-s)}
+.note-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.note-title{font:600 13px/1 var(--font);color:var(--text)}
+.note-meta{font:400 10px/1 var(--font);color:var(--t3)}
+.note-body{font:400 13px/1.5 var(--font);color:var(--t2);white-space:pre-wrap;word-break:break-word}
+.note-actions{display:flex;gap:4px;opacity:0;transition:var(--tr)}
+.note-card:hover .note-actions{opacity:1}
+.note-act-btn{border:none;background:none;cursor:pointer;color:var(--t3);padding:3px;border-radius:4px;display:flex;align-items:center;transition:var(--tr)}
+.note-act-btn:hover{color:var(--text);background:var(--s3)}
+.note-act-btn.del:hover{color:#dc2626;background:#fef2f2}
+
+/* ── Global Calendar (Sidebar) ── */
+.gcal{padding:0 2px}
+.gcal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.gcal-title{font:500 11px/1 var(--font);color:var(--t2)}
+.gcal-navs{display:flex;gap:2px}
+.gcal-nav{width:20px;height:20px;border:none;border-radius:4px;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--t3);transition:var(--tr)}
+.gcal-nav:hover{background:var(--s2);color:var(--text)}
+.gcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px}
+.gcal-dh{text-align:center;font:500 8px/1 var(--font);text-transform:uppercase;color:var(--t4);padding:3px 0}
+.gcal-d{text-align:center;font:400 10px/1 var(--font);color:var(--t3);padding:4px 2px;border-radius:4px;cursor:pointer;transition:var(--tr);position:relative}
+.gcal-d:hover{background:var(--s2);color:var(--text)}
+.gcal-d.other{opacity:.25}
+.gcal-d.today{font-weight:700;color:var(--text);background:var(--s2)}
+.gcal-d.has-tasks::after{content:'';position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--text)}
+.gcal-d.has-tasks.has-overdue::after{background:#dc2626}
+.gcal-pending{margin-top:10px;display:flex;flex-direction:column;gap:3px}
+.gcal-task{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;background:var(--s2);font:400 11px/1.3 var(--font);color:var(--text);cursor:default}
+.gcal-task-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.gcal-task-date{margin-left:auto;font:400 9px/1 var(--font);color:var(--t3);flex-shrink:0}
+
 @media(max-width:768px){
   .sidebar{display:none}.topbar{padding:0 16px}.content{padding:16px}
   .week-grid{grid-template-columns:1fr}.stats-row{grid-template-columns:repeat(2,1fr)}
@@ -222,6 +256,7 @@ const I = {
   target: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.3"/><circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.3"/><circle cx="8" cy="8" r=".8" fill="currentColor"/></svg>,
   list: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M5 4H14M5 8H14M5 12H14M2 4H2.01M2 8H2.01M2 12H2.01" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
   check: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  note: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 2.5H10.5C11.3 2.5 12 3.2 12 4V10L9 13H4C3.2 13 2.5 12.3 2.5 11.5V4C2.5 3.2 3.2 2.5 4 2.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 10V13L12 10H9Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M5.5 6H9.5M5.5 8.5H8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
 };
 
 // ━━━ PASSWORD GATE ━━━
@@ -293,6 +328,7 @@ function Dashboard() {
   const [projects, setProjects] = useStorage("cp_projects", []);
   const [tasks, setTasks] = useStorage("cp_tasks", []);
   const [sources, setSources] = useStorage("cp_sources", []);
+  const [notes, setNotes] = useStorage("cp_notes", []);
   const [activeProject, setActiveProject] = useState(null);
   const [showNewProject, setShowNewProject] = useState(false);
   const [taskModal, setTaskModal] = useState(null);
@@ -302,6 +338,7 @@ function Dashboard() {
     setProjects(prev => prev.filter(p => p.id !== id));
     setTasks(prev => prev.filter(t => t.projectId !== id));
     setSources(prev => prev.filter(s => s.projectId !== id));
+    setNotes(prev => prev.filter(n => n.projectId !== id));
     if (activeProject === id) setActiveProject(null);
   };
   const toggleTask = (id) => setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : null } : t));
@@ -313,11 +350,19 @@ function Dashboard() {
   };
   const addSource = (projectId, url, label) => setSources(prev => [...prev, { id: uid(), projectId, url, label, addedAt: new Date().toISOString() }]);
   const deleteSource = (id) => setSources(prev => prev.filter(s => s.id !== id));
+
+  // ── Notes CRUD ──
+  const saveNote = (note) => {
+    if (note.id) setNotes(prev => prev.map(n => n.id === note.id ? { ...n, ...note, updatedAt: new Date().toISOString() } : n));
+    else setNotes(prev => [...prev, { ...note, id: uid(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]);
+  };
+  const deleteNote = (id) => setNotes(prev => prev.filter(n => n.id !== id));
+
   const activeProj = projects.find(p => p.id === activeProject);
 
   // ── Backup: Export ──
   const exportBackup = () => {
-    const data = { projects, tasks, sources, exportedAt: new Date().toISOString(), version: 1 };
+    const data = { projects, tasks, sources, notes, exportedAt: new Date().toISOString(), version: 2 };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -338,10 +383,11 @@ function Dashboard() {
         try {
           const data = JSON.parse(ev.target.result);
           if (!data.projects || !data.tasks) { alert('Invalid backup file.'); return; }
-          if (!confirm(`This will replace all current data with the backup from ${new Date(data.exportedAt).toLocaleDateString()}.\n\n${data.projects.length} projects, ${data.tasks.length} tasks, ${(data.sources || []).length} sources.\n\nContinue?`)) return;
+          if (!confirm(`This will replace all current data with the backup from ${new Date(data.exportedAt).toLocaleDateString()}.\n\n${data.projects.length} projects, ${data.tasks.length} tasks, ${(data.sources || []).length} sources, ${(data.notes || []).length} notes.\n\nContinue?`)) return;
           setProjects(data.projects);
           setTasks(data.tasks);
           setSources(data.sources || []);
+          setNotes(data.notes || []);
           setActiveProject(null);
           alert('Backup restored successfully!');
         } catch { alert('Could not read backup file. Make sure it\'s a valid CommandPost backup.'); }
@@ -384,6 +430,7 @@ function Dashboard() {
                 <div className="stat-c"><div className="stat-n">{tasks.filter(t => t.done).length}</div><div className="stat-l">Done</div></div>
               </div>
             </div>
+            <GlobalMiniCal tasks={tasks} projects={projects} />
           </aside>
           <main className="content">
             {!activeProject ? (
@@ -391,10 +438,12 @@ function Dashboard() {
             ) : (
               <ProjectDashboard project={activeProj} tasks={tasks.filter(t => t.projectId === activeProject)}
                 sources={sources.filter(s => s.projectId === activeProject)}
+                notes={notes.filter(n => n.projectId === activeProject)}
                 onAddTask={(date) => setTaskModal({ mode: "add", date })}
                 onEditTask={(task) => setTaskModal({ mode: "edit", task })}
                 toggleTask={toggleTask} deleteProject={deleteProject}
-                addSource={(u, l) => addSource(activeProject, u, l)} deleteSource={deleteSource} />
+                addSource={(u, l) => addSource(activeProject, u, l)} deleteSource={deleteSource}
+                saveNote={(n) => saveNote({ ...n, projectId: activeProject })} deleteNote={deleteNote} />
             )}
           </main>
         </div>
@@ -446,13 +495,14 @@ function GlobalOverview({ projects, tasks, onSelect, onNew }) {
 }
 
 // ━━━ PROJECT DASHBOARD ━━━
-function ProjectDashboard({ project, tasks, sources, onAddTask, onEditTask, toggleTask, deleteProject, addSource, deleteSource }) {
+function ProjectDashboard({ project, tasks, sources, notes, onAddTask, onEditTask, toggleTask, deleteProject, addSource, deleteSource, saveNote, deleteNote }) {
   const [tab, setTab] = useState("overview");
   const [calView, setCalView] = useState("week");
   const [currentDate, setCurrentDate] = useState(todayStr());
   const [filterCat, setFilterCat] = useState(null);
   const [srcUrl, setSrcUrl] = useState("");
   const [srcLabel, setSrcLabel] = useState("");
+  const [editingNote, setEditingNote] = useState(null); // null | 'new' | note object
 
   const td = todayStr();
   const done = tasks.filter(t => t.done).length;
@@ -485,6 +535,7 @@ function ProjectDashboard({ project, tasks, sources, onAddTask, onEditTask, togg
     { id: "overview", label: "Overview", icon: I.chart },
     { id: "calendar", label: "Calendar", icon: I.cal },
     { id: "tasks", label: "All Tasks", icon: I.list },
+    { id: "notes", label: "Notes", icon: I.note },
     { id: "sources", label: "Sources", icon: I.link },
   ];
 
@@ -584,6 +635,47 @@ function ProjectDashboard({ project, tasks, sources, onAddTask, onEditTask, togg
       {/* ── ALL TASKS ── */}
       {tab === "tasks" && <AllTasksView tasks={tasks} onEdit={onEditTask} toggleTask={toggleTask} />}
 
+      {/* ── NOTES ── */}
+      {tab === "notes" && (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <span style={{ font: "400 13px/1 var(--font)", color: "var(--t3)" }}>{notes.length} note{notes.length !== 1 ? "s" : ""}</span>
+            <button className="btn btn-p btn-sm" onClick={() => setEditingNote("new")}>{I.plus} New Note</button>
+          </div>
+
+          {editingNote && (
+            <NoteEditor
+              note={editingNote === "new" ? null : editingNote}
+              onSave={(n) => { saveNote(n); setEditingNote(null); }}
+              onCancel={() => setEditingNote(null)}
+              color={project.color}
+            />
+          )}
+
+          {notes.length === 0 && !editingNote && (
+            <div className="empty"><div className="empty-icon">✎</div><div className="empty-txt">No notes yet. Add ideas, strategies, meeting notes, or anything related to this project.</div></div>
+          )}
+
+          <div className="notes-list">
+            {[...notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(n => (
+              <div key={n.id} className="note-card">
+                <div className="note-head">
+                  <span className="note-title">{n.title || "Untitled"}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className="note-meta">{new Date(n.updatedAt).toLocaleDateString()}</span>
+                    <div className="note-actions">
+                      <button className="note-act-btn" onClick={() => setEditingNote(n)}>{I.list}</button>
+                      <button className="note-act-btn del" onClick={() => { if (confirm("Delete this note?")) deleteNote(n.id); }}>{I.trash}</button>
+                    </div>
+                  </div>
+                </div>
+                <div className="note-body">{n.content}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── SOURCES ── */}
       {tab === "sources" && (
         <div className="panel">
@@ -601,6 +693,98 @@ function ProjectDashboard({ project, tasks, sources, onAddTask, onEditTask, togg
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ━━━ GLOBAL MINI CALENDAR (Sidebar) ━━━
+function GlobalMiniCal({ tasks, projects }) {
+  const [calDate, setCalDate] = useState(() => { const d = new Date(); return { month: d.getMonth(), year: d.getFullYear() }; });
+  const td = todayStr();
+  const monthDates = getMonthDates(calDate.year, calDate.month);
+  const pendingByDate = useMemo(() => {
+    const map = {};
+    tasks.filter(t => !t.done).forEach(t => { if (!map[t.date]) map[t.date] = []; map[t.date].push(t); });
+    return map;
+  }, [tasks]);
+
+  const nav = (dir) => {
+    const d = new Date(calDate.year, calDate.month + dir, 1);
+    setCalDate({ month: d.getMonth(), year: d.getFullYear() });
+  };
+
+  // Upcoming 5 pending tasks across all projects
+  const upcoming = useMemo(() =>
+    tasks.filter(t => !t.done && t.date >= td).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5)
+  , [tasks, td]);
+
+  return (
+    <div>
+      <div className="s-label">Calendar</div>
+      <div className="gcal">
+        <div className="gcal-head">
+          <span className="gcal-title">{MONTHS[calDate.month].slice(0, 3)} {calDate.year}</span>
+          <div className="gcal-navs">
+            <button className="gcal-nav" onClick={() => nav(-1)}>‹</button>
+            <button className="gcal-nav" onClick={() => nav(1)}>›</button>
+          </div>
+        </div>
+        <div className="gcal-grid">
+          {["M","T","W","T","F","S","S"].map((d, i) => <div key={i} className="gcal-dh">{d}</div>)}
+          {monthDates.map((date, i) => {
+            const dd = new Date(date + "T00:00:00");
+            const isOther = dd.getMonth() !== calDate.month;
+            const hasTasks = pendingByDate[date]?.length > 0;
+            const hasOverdue = hasTasks && date < td;
+            return (
+              <div key={i} className={`gcal-d ${isOther ? "other" : ""} ${isToday(date) ? "today" : ""} ${hasTasks ? "has-tasks" : ""} ${hasOverdue ? "has-overdue" : ""}`}>
+                {dd.getDate()}
+              </div>
+            );
+          })}
+        </div>
+        {upcoming.length > 0 && (
+          <div className="gcal-pending">
+            <div style={{ font: "500 9px/1 var(--font)", textTransform: "uppercase", letterSpacing: ".08em", color: "var(--t3)", marginBottom: 2 }}>Upcoming</div>
+            {upcoming.map(t => {
+              const proj = projects.find(p => p.id === t.projectId);
+              const df = daysFromNow(t.date);
+              return (
+                <div key={t.id} className="gcal-task">
+                  <span className="gcal-task-dot" style={{ background: proj?.color || "var(--t3)" }} />
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</span>
+                  <span className="gcal-task-date">{df === 0 ? "Today" : df === 1 ? "Tmrw" : fmtDate(t.date)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ━━━ NOTE EDITOR ━━━
+function NoteEditor({ note, onSave, onCancel, color }) {
+  const [title, setTitle] = useState(note?.title || "");
+  const [content, setContent] = useState(note?.content || "");
+
+  return (
+    <div className="panel" style={{ borderColor: color + "40", marginBottom: 16 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <input className="fi" placeholder="Note title" value={title} onChange={e => setTitle(e.target.value)} autoFocus
+          style={{ fontWeight: 600, fontSize: 14, border: "none", padding: "6px 0", background: "transparent" }} />
+        <textarea className="fi" placeholder="Write your note here... ideas, strategies, links, meeting notes, anything."
+          value={content} onChange={e => setContent(e.target.value)}
+          style={{ minHeight: 120, fontSize: 13, lineHeight: 1.6, border: "none", padding: "6px 0", background: "transparent" }} />
+        <div className="btn-row">
+          <button className="btn btn-g btn-sm" onClick={onCancel}>Cancel</button>
+          <button className="btn btn-p btn-sm" disabled={!content.trim()}
+            onClick={() => onSave({ ...(note?.id ? note : {}), title: title.trim(), content: content.trim() })}>
+            {note?.id ? "Update" : "Save Note"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
