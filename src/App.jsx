@@ -332,7 +332,7 @@ function GlobalOverview({projects,tasks,onSelect,onNew}){
 function ProjectDashboard({project,tasks,sources,notes,progressEntries,onAddTask,onEditTask,toggleTask,deleteProject,togglePause,clearTasks,addSource,deleteSource,saveNote,deleteNote,saveProgress,deleteProgress}){
   const[tab,setTab]=useState("overview");const[calView,setCalView]=useState("week");const[currentDate,setCurrentDate]=useState(todayStr());
   const[filterCat,setFilterCat]=useState(null);const[srcUrl,setSrcUrl]=useState("");const[srcLabel,setSrcLabel]=useState("");
-  const[editingNote,setEditingNote]=useState(null);const[viewingNote,setViewingNote]=useState(null);const[editingProg,setEditingProg]=useState(null);
+  const[editingNote,setEditingNote]=useState(null);const[viewingNote,setViewingNote]=useState(null);const[editingProg,setEditingProg]=useState(null);const[viewingTpl,setViewingTpl]=useState(null);
   const[noteTagFilter,setNoteTagFilter]=useState(null);const[progTagFilter,setProgTagFilter]=useState(null);const[tplCatFilter,setTplCatFilter]=useState(null);
 
   const td=todayStr();const done=tasks.filter(t=>t.done).length;const pending=tasks.filter(t=>!t.done).length;
@@ -460,13 +460,29 @@ function ProjectDashboard({project,tasks,sources,notes,progressEntries,onAddTask
         <div className="chip-sel"><button className={`chip-o ${!tplCatFilter?"sel":""}`} onClick={()=>setTplCatFilter(null)} style={{fontSize:11}}>All</button>{tplCats.map(c=><button key={c} className={`chip-o ${tplCatFilter===c?"sel":""}`} onClick={()=>setTplCatFilter(tplCatFilter===c?null:c)} style={{fontSize:11}}>{c}</button>)}</div>
       </div>
       <div className="tpl-grid">{filteredTpls.map(t=>
-        <div key={t.id} className="tpl-card" onClick={()=>{saveNote({title:t.title,content:t.content,tag:t.cat==="Social Media"?"Strategy":t.cat==="SEO"?"Strategy":t.cat==="Content"?"General":t.cat==="Analytics"?"Research":t.cat==="Development"?"General":t.cat==="Design"?"Reference":"General"});setTab("notes");alert(`"${t.title}" added to Notes!`);}}>
+        <div key={t.id} className="tpl-card" onClick={()=>setViewingTpl(t)}>
           <div className="tpl-cat">{t.cat}</div>
           <div className="tpl-name">{t.title}</div>
           <div className="tpl-preview">{t.content.slice(0,100)}...</div>
         </div>
       )}</div>
-      <p style={{font:"400 12px/1.4 var(--font)",color:"var(--t3)",marginTop:16,textAlign:"center"}}>Click any template to add it as a note you can edit.</p>
+      <p style={{font:"400 12px/1.4 var(--font)",color:"var(--t3)",marginTop:16,textAlign:"center"}}>Click any template to preview it.</p>
+      {viewingTpl&&<div className="modal-ov" onClick={()=>setViewingTpl(null)}><div className="modal" onClick={e=>e.stopPropagation()} style={{width:560}}>
+        <div className="modal-h">
+          <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
+            <span className="modal-t" style={{flex:1}}>{viewingTpl.title}</span>
+            <span className="nt-tag" style={{fontSize:10,flexShrink:0}}>{viewingTpl.cat}</span>
+          </div>
+          <button className="modal-x" onClick={()=>setViewingTpl(null)}>{I.close}</button>
+        </div>
+        <div className="modal-b" style={{gap:16}}>
+          <div style={{font:"400 14px/1.7 var(--font)",color:"var(--t2)",whiteSpace:"pre-wrap",wordBreak:"break-word",background:"var(--s2)",borderRadius:"var(--r)",padding:16,maxHeight:"50vh",overflowY:"auto"}}>{viewingTpl.content}</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8,borderTop:"1px solid var(--border-s)",paddingTop:12}}>
+            <button className="btn btn-g btn-sm" onClick={()=>{navigator.clipboard.writeText(viewingTpl.content);alert("Copied to clipboard!")}}>Copy Text</button>
+            <button className="btn btn-p btn-sm" onClick={()=>{saveNote({title:viewingTpl.title,content:viewingTpl.content,tag:viewingTpl.cat==="Social Media"?"Strategy":viewingTpl.cat==="SEO"?"Strategy":viewingTpl.cat==="Content"?"General":viewingTpl.cat==="Analytics"?"Research":"General"});setViewingTpl(null);setTab("notes");}}>Save to Notes</button>
+          </div>
+        </div>
+      </div></div>}
     </div>}
 
     {/* SOURCES */}
