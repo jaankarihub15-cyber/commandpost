@@ -362,11 +362,21 @@ function ProjectDashboard({project,tasks,sources,notes,progressEntries,onAddTask
   const TABS=[{id:"overview",label:"Overview",icon:I.chart},{id:"calendar",label:"Calendar",icon:I.cal},{id:"tasks",label:"Tasks",icon:I.list},{id:"progress",label:"Progress",icon:I.bolt},{id:"notes",label:"Notes",icon:I.note},{id:"templates",label:"Templates",icon:I.tpl},{id:"sources",label:"Sources",icon:I.link}];
 
   return(<div>
-    {project.paused&&<div className="pause-banner">{I.pause}<span><strong>{project.name}</strong> is paused. All data is preserved.</span><button className="btn btn-sm btn-p" onClick={()=>togglePause(project.id)}>{I.play} Resume</button></div>}
-    <div className="pd-header">
-      <div className="pd-pill" style={{background:project.paused?"var(--t3)":project.color}}><span>{project.name}</span><span className="pd-type">{project.type}</span></div>
+    {project.paused&&<div>
+      <div className="pause-banner" style={{flexDirection:"column",alignItems:"center",padding:"48px 24px",textAlign:"center",gap:16}}>
+        <div style={{fontSize:40,opacity:.3}}>⏸</div>
+        <div style={{font:"600 20px/1.2 var(--fd)",color:"#92400e"}}>{project.name} is paused</div>
+        <div style={{font:"400 13px/1.5 var(--font)",color:"#a16207",maxWidth:360}}>This project is on hold. All your data — tasks, notes, progress, templates, and sources — is safely preserved. Resume when you're ready to get back to it.</div>
+        <div style={{display:"flex",gap:8,marginTop:8}}>
+          <button className="btn btn-p" onClick={()=>togglePause(project.id)}>{I.play} Resume Project</button>
+          <button className="btn btn-d btn-sm" onClick={()=>{if(confirm(`Delete "${project.name}"?`))deleteProject(project.id);}}>{I.trash} Delete</button>
+        </div>
+      </div>
+    </div>}
+    {!project.paused&&<><div className="pd-header">
+      <div className="pd-pill" style={{background:project.color}}><span>{project.name}</span><span className="pd-type">{project.type}</span></div>
       <div style={{marginLeft:"auto",display:"flex",gap:6,flexWrap:"wrap"}}>
-        <button className="btn btn-sm" style={{background:project.paused?"#dcfce7":("#fffbeb"),color:project.paused?"#16a34a":"#d97706"}} onClick={()=>togglePause(project.id)}>{project.paused?<>{I.play} Resume</>:<>{I.pause} Pause</>}</button>
+        <button className="btn btn-sm" style={{background:"#fffbeb",color:"#d97706"}} onClick={()=>togglePause(project.id)}>{I.pause} Pause</button>
         <button className="btn btn-p btn-sm" onClick={()=>{setTab("calendar");setTimeout(()=>onAddTask(td),50);}}>{I.plus} Add Task</button>
         <button className="btn btn-d btn-sm" onClick={()=>{if(confirm(`Delete "${project.name}"?`))deleteProject(project.id);}}>{I.trash}</button>
       </div>
@@ -472,6 +482,7 @@ function ProjectDashboard({project,tasks,sources,notes,progressEntries,onAddTask
         <button className="btn btn-p btn-sm" onClick={()=>{if(srcUrl.trim()){addSource(srcUrl.trim(),srcLabel.trim());setSrcUrl("");setSrcLabel("");}}} >Add</button>
       </div>
     </div>}
+    </>}
   </div>);
 }
 
