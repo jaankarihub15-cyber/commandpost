@@ -237,12 +237,13 @@ function Dashboard(){
   const[sources,setSources]=useStorage("cp_sources",[]);
   const[notes,setNotes]=useStorage("cp_notes",[]);
   const[progress,setProgress]=useStorage("cp_progress",[]);
+  const[customTpls,setCustomTpls]=useStorage("cp_templates",[]);
   const[activeProject,setActiveProject]=useState(null);
   const[showNewProject,setShowNewProject]=useState(false);
   const[taskModal,setTaskModal]=useState(null);
 
   const addProject=(p)=>{setProjects(prev=>[...prev,{...p,id:uid(),paused:false,createdAt:new Date().toISOString()}]);setShowNewProject(false);};
-  const deleteProject=(id)=>{setProjects(p=>p.filter(x=>x.id!==id));setTasks(p=>p.filter(x=>x.projectId!==id));setSources(p=>p.filter(x=>x.projectId!==id));setNotes(p=>p.filter(x=>x.projectId!==id));setProgress(p=>p.filter(x=>x.projectId!==id));if(activeProject===id)setActiveProject(null);};
+  const deleteProject=(id)=>{setProjects(p=>p.filter(x=>x.id!==id));setTasks(p=>p.filter(x=>x.projectId!==id));setSources(p=>p.filter(x=>x.projectId!==id));setNotes(p=>p.filter(x=>x.projectId!==id));setProgress(p=>p.filter(x=>x.projectId!==id));setCustomTpls(p=>p.filter(x=>x.projectId!==id));if(activeProject===id)setActiveProject(null);};
   const togglePause=(id)=>{setProjects(p=>p.map(x=>x.id===id?{...x,paused:!x.paused}:x));};
   const toggleTask=(id)=>setTasks(p=>p.map(t=>t.id===id?{...t,done:!t.done,doneAt:!t.done?new Date().toISOString():null}:t));
   const deleteTask=(id)=>setTasks(p=>p.filter(t=>t.id!==id));
@@ -254,11 +255,13 @@ function Dashboard(){
   const deleteNote=(id)=>setNotes(p=>p.filter(n=>n.id!==id));
   const saveProgress=(entry)=>{if(entry.id)setProgress(p=>p.map(e=>e.id===entry.id?{...e,...entry,updatedAt:new Date().toISOString()}:e));else setProgress(p=>[...p,{...entry,id:uid(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}]);};
   const deleteProgress=(id)=>setProgress(p=>p.filter(e=>e.id!==id));
+  const saveCustomTpl=(tpl)=>{if(tpl.id)setCustomTpls(p=>p.map(t=>t.id===tpl.id?{...t,...tpl}:t));else setCustomTpls(p=>[...p,{...tpl,id:uid(),createdAt:new Date().toISOString()}]);};
+  const deleteCustomTpl=(id)=>setCustomTpls(p=>p.filter(t=>t.id!==id));
 
   const activeProj=projects.find(p=>p.id===activeProject);
 
-  const exportBackup=()=>{const d={projects,tasks,sources,notes,progress,exportedAt:new Date().toISOString(),version:3};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`commandpost-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(u);};
-  const importBackup=()=>{const inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=(e)=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=(ev)=>{try{const d=JSON.parse(ev.target.result);if(!d.projects||!d.tasks){alert('Invalid backup.');return;}if(!confirm(`Replace all data with backup from ${new Date(d.exportedAt).toLocaleDateString()}?\n\n${d.projects.length} projects, ${d.tasks.length} tasks`))return;setProjects(d.projects);setTasks(d.tasks);setSources(d.sources||[]);setNotes(d.notes||[]);setProgress(d.progress||[]);setActiveProject(null);alert('Restored!');}catch{alert('Invalid file.');}};r.readAsText(f);};inp.click();};
+  const exportBackup=()=>{const d={projects,tasks,sources,notes,progress,customTpls,exportedAt:new Date().toISOString(),version:4};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`commandpost-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(u);};
+  const importBackup=()=>{const inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=(e)=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=(ev)=>{try{const d=JSON.parse(ev.target.result);if(!d.projects||!d.tasks){alert('Invalid backup.');return;}if(!confirm(`Replace all data with backup from ${new Date(d.exportedAt).toLocaleDateString()}?\n\n${d.projects.length} projects, ${d.tasks.length} tasks`))return;setProjects(d.projects);setTasks(d.tasks);setSources(d.sources||[]);setNotes(d.notes||[]);setProgress(d.progress||[]);setCustomTpls(d.customTpls||[]);setActiveProject(null);alert('Restored!');}catch{alert('Invalid file.');}};r.readAsText(f);};inp.click();};
 
   return(<><style>{css}</style><div className="app">
     <header className="topbar">
@@ -294,7 +297,9 @@ function Dashboard(){
           clearTasks={()=>clearTasks(activeProject)}
           addSource={(u,l)=>addSource(activeProject,u,l)} deleteSource={deleteSource}
           saveNote={n=>saveNote({...n,projectId:activeProject})} deleteNote={deleteNote}
-          saveProgress={e=>saveProgress({...e,projectId:activeProject})} deleteProgress={deleteProgress}/>}
+          saveProgress={e=>saveProgress({...e,projectId:activeProject})} deleteProgress={deleteProgress}
+          customTpls={customTpls.filter(t=>t.projectId===activeProject)}
+          saveCustomTpl={t=>saveCustomTpl({...t,projectId:activeProject})} deleteCustomTpl={deleteCustomTpl}/>}
       </main>
     </div>
     {showNewProject&&<NewProjectModal onSave={addProject} onClose={()=>setShowNewProject(false)}/>}
@@ -329,7 +334,7 @@ function GlobalOverview({projects,tasks,onSelect,onNew}){
 }
 
 // ━━━ PROJECT DASHBOARD ━━━
-function ProjectDashboard({project,tasks,sources,notes,progressEntries,onAddTask,onEditTask,toggleTask,deleteProject,togglePause,clearTasks,addSource,deleteSource,saveNote,deleteNote,saveProgress,deleteProgress}){
+function ProjectDashboard({project,tasks,sources,notes,progressEntries,onAddTask,onEditTask,toggleTask,deleteProject,togglePause,clearTasks,addSource,deleteSource,saveNote,deleteNote,saveProgress,deleteProgress,customTpls,saveCustomTpl,deleteCustomTpl}){
   const[tab,setTab]=useState("overview");const[calView,setCalView]=useState("week");const[currentDate,setCurrentDate]=useState(todayStr());
   const[filterCat,setFilterCat]=useState(null);const[srcUrl,setSrcUrl]=useState("");const[srcLabel,setSrcLabel]=useState("");
   const[editingNote,setEditingNote]=useState(null);const[viewingNote,setViewingNote]=useState(null);const[editingProg,setEditingProg]=useState(null);const[viewingTpl,setViewingTpl]=useState(null);
@@ -455,35 +460,7 @@ function ProjectDashboard({project,tasks,sources,notes,progressEntries,onAddTask
     </div>}
 
     {/* TEMPLATES */}
-    {tab==="templates"&&<div>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:8}}>
-        <div className="chip-sel"><button className={`chip-o ${!tplCatFilter?"sel":""}`} onClick={()=>setTplCatFilter(null)} style={{fontSize:11}}>All</button>{tplCats.map(c=><button key={c} className={`chip-o ${tplCatFilter===c?"sel":""}`} onClick={()=>setTplCatFilter(tplCatFilter===c?null:c)} style={{fontSize:11}}>{c}</button>)}</div>
-      </div>
-      <div className="tpl-grid">{filteredTpls.map(t=>
-        <div key={t.id} className="tpl-card" onClick={()=>setViewingTpl(t)}>
-          <div className="tpl-cat">{t.cat}</div>
-          <div className="tpl-name">{t.title}</div>
-          <div className="tpl-preview">{t.content.slice(0,100)}...</div>
-        </div>
-      )}</div>
-      <p style={{font:"400 12px/1.4 var(--font)",color:"var(--t3)",marginTop:16,textAlign:"center"}}>Click any template to preview it.</p>
-      {viewingTpl&&<div className="modal-ov" onClick={()=>setViewingTpl(null)}><div className="modal" onClick={e=>e.stopPropagation()} style={{width:560}}>
-        <div className="modal-h">
-          <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
-            <span className="modal-t" style={{flex:1}}>{viewingTpl.title}</span>
-            <span className="nt-tag" style={{fontSize:10,flexShrink:0}}>{viewingTpl.cat}</span>
-          </div>
-          <button className="modal-x" onClick={()=>setViewingTpl(null)}>{I.close}</button>
-        </div>
-        <div className="modal-b" style={{gap:16}}>
-          <div style={{font:"400 14px/1.7 var(--font)",color:"var(--t2)",whiteSpace:"pre-wrap",wordBreak:"break-word",background:"var(--s2)",borderRadius:"var(--r)",padding:16,maxHeight:"50vh",overflowY:"auto"}}>{viewingTpl.content}</div>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8,borderTop:"1px solid var(--border-s)",paddingTop:12}}>
-            <button className="btn btn-g btn-sm" onClick={()=>{navigator.clipboard.writeText(viewingTpl.content);alert("Copied to clipboard!")}}>Copy Text</button>
-            <button className="btn btn-p btn-sm" onClick={()=>{saveNote({title:viewingTpl.title,content:viewingTpl.content,tag:viewingTpl.cat==="Social Media"?"Strategy":viewingTpl.cat==="SEO"?"Strategy":viewingTpl.cat==="Content"?"General":viewingTpl.cat==="Analytics"?"Research":"General"});setViewingTpl(null);setTab("notes");}}>Save to Notes</button>
-          </div>
-        </div>
-      </div></div>}
-    </div>}
+    {tab==="templates"&&<TemplatesTab presets={TEMPLATES} custom={customTpls} saveCustom={saveCustomTpl} deleteCustom={deleteCustomTpl} color={project.color}/>}
 
     {/* SOURCES */}
     {tab==="sources"&&<div className="panel">
@@ -604,6 +581,114 @@ function TaskModal({modal,projects,activeProject,onSave,onDelete,onClose}){
       <div className="btn-row">{isE&&<button className="btn btn-d" onClick={()=>{onDelete(modal.task.id);onClose();}} style={{marginRight:"auto"}}>{I.trash} Delete</button>}<button className="btn btn-g" onClick={onClose}>Cancel</button><button className="btn btn-p" disabled={!f.title.trim()||!f.date||!f.projectId} onClick={()=>onSave({...(isE?modal.task:{}),...f})}>{isE?"Update":"Create"}</button></div>
     </div>
   </div></div>);
+}
+
+// ━━━ TEMPLATES TAB ━━━
+function TemplatesTab({presets,custom,saveCustom,deleteCustom,color}){
+  const[viewing,setViewing]=useState(null); // {title,content,cat,id?,isCustom?}
+  const[editing,setEditing]=useState(null); // null | 'new' | tpl object
+  const[catFilter,setCatFilter]=useState(null);
+
+  const allTpls=[...presets.map(t=>({...t,isCustom:false})),...custom.map(t=>({...t,isCustom:true}))];
+  const cats=[...new Set(allTpls.map(t=>t.cat))];
+  const filtered=catFilter?allTpls.filter(t=>t.cat===catFilter):allTpls;
+
+  // Editing state
+  const[eTitle,setETitle]=useState("");const[eContent,setEContent]=useState("");const[eCat,setECat]=useState("General");
+  const startEdit=(tpl)=>{setETitle(tpl?.title||"");setEContent(tpl?.content||"");setECat(tpl?.cat||"General");setEditing(tpl||"new");setViewing(null);};
+  const cancelEdit=()=>{setEditing(null);};
+  const handleSave=()=>{if(!eTitle.trim()||!eContent.trim())return;saveCustom({...(editing!=="new"&&editing?.id?editing:{}),title:eTitle.trim(),content:eContent.trim(),cat:eCat});setEditing(null);};
+
+  // View mode editing (inline in the dialog)
+  const[viewEditing,setViewEditing]=useState(false);
+  const[veContent,setVeContent]=useState("");
+
+  const openView=(tpl)=>{setViewing(tpl);setViewEditing(false);setVeContent(tpl.content);};
+
+  return(<div>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:8}}>
+      <div className="chip-sel">
+        <button className={`chip-o ${!catFilter?"sel":""}`} onClick={()=>setCatFilter(null)} style={{fontSize:11}}>All</button>
+        {cats.map(c=><button key={c} className={`chip-o ${catFilter===c?"sel":""}`} onClick={()=>setCatFilter(catFilter===c?null:c)} style={{fontSize:11}}>{c}</button>)}
+      </div>
+      <button className="btn btn-p btn-sm" onClick={()=>startEdit(null)}>{I.plus} New Template</button>
+    </div>
+
+    {/* Create / Edit form */}
+    {editing&&<div className="panel" style={{borderColor:color+"40",marginBottom:16}}>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <div className="fr">
+          <input className="fi" placeholder="Template title" value={eTitle} onChange={e=>setETitle(e.target.value)} autoFocus style={{fontWeight:600,fontSize:14}}/>
+          <select className="fi" value={eCat} onChange={e=>setECat(e.target.value)} style={{maxWidth:160}}>
+            {["General","Social Media","SEO","Content","Analytics","Development","Design","Other"].map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <textarea className="fi" placeholder="Template content... use placeholders like [Name], [Topic], etc." value={eContent} onChange={e=>setEContent(e.target.value)} style={{minHeight:120,fontSize:13,lineHeight:1.6}}/>
+        <div className="btn-row">
+          <button className="btn btn-g btn-sm" onClick={cancelEdit}>Cancel</button>
+          <button className="btn btn-p btn-sm" disabled={!eTitle.trim()||!eContent.trim()} onClick={handleSave}>{editing!=="new"&&editing?.id?"Update":"Create Template"}</button>
+        </div>
+      </div>
+    </div>}
+
+    {/* Custom templates section */}
+    {custom.length>0&&<>
+      <div className="s-label" style={{padding:0,marginBottom:10}}>Your Templates</div>
+      <div className="tpl-grid" style={{marginBottom:24}}>
+        {(catFilter?custom.filter(t=>t.cat===catFilter):custom).map(t=>
+          <div key={t.id} className="tpl-card" onClick={()=>openView({...t,isCustom:true})} style={{borderLeft:`3px solid ${color}`}}>
+            <div className="tpl-cat">{t.cat}</div>
+            <div className="tpl-name">{t.title}</div>
+            <div className="tpl-preview">{t.content.slice(0,100)}...</div>
+          </div>
+        )}
+      </div>
+    </>}
+
+    {/* Preset templates */}
+    <div className="s-label" style={{padding:0,marginBottom:10}}>Preset Templates</div>
+    <div className="tpl-grid">
+      {(catFilter?presets.filter(t=>t.cat===catFilter):presets).map(t=>
+        <div key={t.id} className="tpl-card" onClick={()=>openView({...t,isCustom:false})}>
+          <div className="tpl-cat">{t.cat}</div>
+          <div className="tpl-name">{t.title}</div>
+          <div className="tpl-preview">{t.content.slice(0,100)}...</div>
+        </div>
+      )}
+    </div>
+
+    {/* View / Edit dialog */}
+    {viewing&&<div className="modal-ov" onClick={()=>setViewing(null)}><div className="modal" onClick={e=>e.stopPropagation()} style={{width:580}}>
+      <div className="modal-h">
+        <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
+          <span className="modal-t" style={{flex:1}}>{viewing.title}</span>
+          <span className="nt-tag" style={{fontSize:10,flexShrink:0}}>{viewing.cat}</span>
+          {viewing.isCustom&&<span className="nt-tag" style={{fontSize:9,background:"var(--s3)"}}>Custom</span>}
+        </div>
+        <button className="modal-x" onClick={()=>setViewing(null)}>{I.close}</button>
+      </div>
+      <div className="modal-b" style={{gap:16}}>
+        {!viewEditing?(
+          <div style={{font:"400 14px/1.7 var(--font)",color:"var(--t2)",whiteSpace:"pre-wrap",wordBreak:"break-word",background:"var(--s2)",borderRadius:"var(--r)",padding:16,maxHeight:"50vh",overflowY:"auto"}}>{veContent}</div>
+        ):(
+          <textarea className="fi" value={veContent} onChange={e=>setVeContent(e.target.value)} style={{minHeight:200,fontSize:13,lineHeight:1.6}}/>
+        )}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderTop:"1px solid var(--border-s)",paddingTop:12}}>
+          <div style={{display:"flex",gap:6}}>
+            {viewing.isCustom&&<button className="btn btn-d btn-sm" onClick={()=>{if(confirm("Delete this template?")){deleteCustom(viewing.id);setViewing(null);}}}>{I.trash}</button>}
+            {viewing.isCustom&&<button className="btn btn-g btn-sm" onClick={()=>{startEdit(viewing);}}>Edit Details</button>}
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <button className="btn btn-g btn-sm" onClick={()=>{navigator.clipboard.writeText(veContent);alert("Copied!")}}>Copy</button>
+            {!viewEditing?
+              <button className="btn btn-p btn-sm" onClick={()=>setViewEditing(true)}>Edit Content</button>:
+              <button className="btn btn-p btn-sm" onClick={()=>{if(viewing.isCustom){saveCustom({...viewing,content:veContent});setViewing({...viewing,content:veContent});}else{saveCustom({title:viewing.title+" (edited)",content:veContent,cat:viewing.cat});}setViewEditing(false);alert(viewing.isCustom?"Updated!":"Saved as custom template!");}}>Save</button>
+            }
+          </div>
+        </div>
+      </div>
+    </div></div>}
+  </div>);
 }
 
 export default function App(){return<AuthGate><Dashboard/></AuthGate>;}
