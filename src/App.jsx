@@ -332,7 +332,7 @@ function GlobalOverview({projects,tasks,onSelect,onNew}){
 function ProjectDashboard({project,tasks,sources,notes,progressEntries,onAddTask,onEditTask,toggleTask,deleteProject,togglePause,clearTasks,addSource,deleteSource,saveNote,deleteNote,saveProgress,deleteProgress}){
   const[tab,setTab]=useState("overview");const[calView,setCalView]=useState("week");const[currentDate,setCurrentDate]=useState(todayStr());
   const[filterCat,setFilterCat]=useState(null);const[srcUrl,setSrcUrl]=useState("");const[srcLabel,setSrcLabel]=useState("");
-  const[editingNote,setEditingNote]=useState(null);const[editingProg,setEditingProg]=useState(null);
+  const[editingNote,setEditingNote]=useState(null);const[viewingNote,setViewingNote]=useState(null);const[editingProg,setEditingProg]=useState(null);
   const[noteTagFilter,setNoteTagFilter]=useState(null);const[progTagFilter,setProgTagFilter]=useState(null);const[tplCatFilter,setTplCatFilter]=useState(null);
 
   const td=todayStr();const done=tasks.filter(t=>t.done).length;const pending=tasks.filter(t=>!t.done).length;
@@ -427,12 +427,31 @@ function ProjectDashboard({project,tasks,sources,notes,progressEntries,onAddTask
       {editingNote&&<NoteEditor note={editingNote==="new"?null:editingNote} onSave={n=>{saveNote(n);setEditingNote(null);}} onCancel={()=>setEditingNote(null)} color={project.color}/>}
       {filteredNotes.length===0&&!editingNote&&<div className="empty"><div className="empty-icon">✎</div><div className="empty-txt">No notes yet. Add ideas, strategies, or references.</div></div>}
       <div className="notes-grid">{[...filteredNotes].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)).map(n=>
-        <div key={n.id} className="note-tile" onClick={()=>setEditingNote(n)}>
+        <div key={n.id} className="note-tile" onClick={()=>setViewingNote(n)}>
           <div className="nt-title">{n.title||"Untitled"}{n.tag&&<span className="nt-tag">{n.tag}</span>}</div>
           <div className="nt-body">{n.content}</div>
-          <div className="nt-meta">{new Date(n.updatedAt).toLocaleDateString()}<button className="src-del" onClick={ev=>{ev.stopPropagation();if(confirm("Delete note?"))deleteNote(n.id);}} style={{marginLeft:6,display:"inline"}}>{I.trash}</button></div>
+          <div className="nt-meta">{new Date(n.updatedAt).toLocaleDateString()}</div>
         </div>
       )}</div>
+      {viewingNote&&<div className="modal-ov" onClick={()=>setViewingNote(null)}><div className="modal" onClick={e=>e.stopPropagation()} style={{width:560}}>
+        <div className="modal-h">
+          <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
+            <span className="modal-t" style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{viewingNote.title||"Untitled"}</span>
+            {viewingNote.tag&&<span className="nt-tag" style={{fontSize:10,flexShrink:0}}>{viewingNote.tag}</span>}
+          </div>
+          <button className="modal-x" onClick={()=>setViewingNote(null)}>{I.close}</button>
+        </div>
+        <div className="modal-b" style={{gap:16}}>
+          <div style={{font:"400 14px/1.7 var(--font)",color:"var(--t2)",whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:"50vh",overflowY:"auto"}}>{viewingNote.content}</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderTop:"1px solid var(--border-s)",paddingTop:12}}>
+            <span style={{font:"400 11px/1 var(--font)",color:"var(--t3)"}}>Updated {new Date(viewingNote.updatedAt).toLocaleDateString()}</span>
+            <div style={{display:"flex",gap:6}}>
+              <button className="btn btn-d btn-sm" onClick={()=>{if(confirm("Delete note?")){deleteNote(viewingNote.id);setViewingNote(null);}}}>{I.trash} Delete</button>
+              <button className="btn btn-p btn-sm" onClick={()=>{setEditingNote(viewingNote);setViewingNote(null);}}>Edit Note</button>
+            </div>
+          </div>
+        </div>
+      </div></div>}
     </div>}
 
     {/* TEMPLATES */}
