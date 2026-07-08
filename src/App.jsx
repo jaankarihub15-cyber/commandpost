@@ -45,6 +45,26 @@ const daysFromNow = (s) => Math.ceil((new Date(s+"T00:00:00")-new Date(todayStr(
 
 function useStorage(k,init) { const [d,setD]=useState(()=>{try{const s=localStorage.getItem(k);return s?JSON.parse(s):init;}catch{return init;}}); useEffect(()=>{localStorage.setItem(k,JSON.stringify(d));},[k,d]); return [d,setD]; }
 
+// Image compression — resize to max 800px and compress to JPEG
+function compressImage(file, maxW=800, quality=0.7) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 const css = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Playfair+Display:wght@500;600;700&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
@@ -201,6 +221,12 @@ select.fi{appearance:none;cursor:pointer;padding-right:30px;background-image:url
 /* Pause banner */
 .pause-banner{background:#fffbeb;border:1px solid #fde68a;border-radius:var(--r);padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;font:400 13px/1.3 var(--font);color:#92400e}
 .pause-banner strong{font-weight:600}
+/* SM Posts in calendar */
+.sm-chip{display:flex;align-items:center;gap:4px;padding:3px 6px;border-radius:5px;font:500 10px/1.2 var(--font);cursor:pointer;transition:var(--tr);background:#fdf2f8;color:#be185d;border:1px solid #fce7f3}
+.sm-chip:hover{background:#fce7f3;border-color:#fbcfe8}
+.sm-chip-img{width:18px;height:18px;border-radius:3px;object-fit:cover;flex-shrink:0}
+.sm-post-preview{width:100%;border-radius:var(--r);overflow:hidden;background:var(--s2)}
+.sm-post-preview img{width:100%;display:block}
 @media(max-width:768px){.sidebar{display:none}.topbar{padding:0 16px}.content{padding:16px}.week-grid{grid-template-columns:1fr}.stats-row{grid-template-columns:repeat(2,1fr)}.two-col{grid-template-columns:1fr!important}.notes-grid{grid-template-columns:1fr}.tpl-grid{grid-template-columns:1fr}}
 `;
 
@@ -220,6 +246,8 @@ const I = {
   play:<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M4 2.5L11.5 7L4 11.5V2.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
   tpl:<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 5H11M5 8H9M5 11H7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
   bolt:<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M9 1.5L4 9H8L7 14.5L12 7H8L9 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
+  cam:<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 5.5C2 4.7 2.7 4 3.5 4H4.5L5.5 2.5H10.5L11.5 4H12.5C13.3 4 14 4.7 14 5.5V12C14 12.8 13.3 13.5 12.5 13.5H3.5C2.7 13.5 2 12.8 2 12V5.5Z" stroke="currentColor" strokeWidth="1.2"/><circle cx="8" cy="8.5" r="2.5" stroke="currentColor" strokeWidth="1.2"/></svg>,
+  download:<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 2V9M7 9L4.5 6.5M7 9L9.5 6.5M3 11.5H11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
 };
 
 // ━━━ AUTH ━━━
@@ -238,12 +266,13 @@ function Dashboard(){
   const[notes,setNotes]=useStorage("cp_notes",[]);
   const[progress,setProgress]=useStorage("cp_progress",[]);
   const[customTpls,setCustomTpls]=useStorage("cp_templates",[]);
+  const[smPosts,setSmPosts]=useStorage("cp_smposts",[]);
   const[activeProject,setActiveProject]=useState(null);
   const[showNewProject,setShowNewProject]=useState(false);
   const[taskModal,setTaskModal]=useState(null);
 
   const addProject=(p)=>{setProjects(prev=>[...prev,{...p,id:uid(),paused:false,createdAt:new Date().toISOString()}]);setShowNewProject(false);};
-  const deleteProject=(id)=>{setProjects(p=>p.filter(x=>x.id!==id));setTasks(p=>p.filter(x=>x.projectId!==id));setSources(p=>p.filter(x=>x.projectId!==id));setNotes(p=>p.filter(x=>x.projectId!==id));setProgress(p=>p.filter(x=>x.projectId!==id));setCustomTpls(p=>p.filter(x=>x.projectId!==id));if(activeProject===id)setActiveProject(null);};
+  const deleteProject=(id)=>{setProjects(p=>p.filter(x=>x.id!==id));setTasks(p=>p.filter(x=>x.projectId!==id));setSources(p=>p.filter(x=>x.projectId!==id));setNotes(p=>p.filter(x=>x.projectId!==id));setProgress(p=>p.filter(x=>x.projectId!==id));setCustomTpls(p=>p.filter(x=>x.projectId!==id));setSmPosts(p=>p.filter(x=>x.projectId!==id));if(activeProject===id)setActiveProject(null);};
   const togglePause=(id)=>{setProjects(p=>p.map(x=>x.id===id?{...x,paused:!x.paused}:x));};
   const toggleTask=(id)=>setTasks(p=>p.map(t=>t.id===id?{...t,done:!t.done,doneAt:!t.done?new Date().toISOString():null}:t));
   const deleteTask=(id)=>setTasks(p=>p.filter(t=>t.id!==id));
@@ -257,11 +286,14 @@ function Dashboard(){
   const deleteProgress=(id)=>setProgress(p=>p.filter(e=>e.id!==id));
   const saveCustomTpl=(tpl)=>{if(tpl.id)setCustomTpls(p=>p.map(t=>t.id===tpl.id?{...t,...tpl}:t));else setCustomTpls(p=>[...p,{...tpl,id:uid(),createdAt:new Date().toISOString()}]);};
   const deleteCustomTpl=(id)=>setCustomTpls(p=>p.filter(t=>t.id!==id));
+  const saveSmPost=(post)=>{if(post.id)setSmPosts(p=>p.map(x=>x.id===post.id?{...x,...post}:x));else setSmPosts(p=>[...p,{...post,id:uid(),posted:false,createdAt:new Date().toISOString()}]);};
+  const deleteSmPost=(id)=>setSmPosts(p=>p.filter(x=>x.id!==id));
+  const togglePosted=(id)=>setSmPosts(p=>p.map(x=>x.id===id?{...x,posted:!x.posted}:x));
 
   const activeProj=projects.find(p=>p.id===activeProject);
 
-  const exportBackup=()=>{const d={projects,tasks,sources,notes,progress,customTpls,exportedAt:new Date().toISOString(),version:4};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`commandpost-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(u);};
-  const importBackup=()=>{const inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=(e)=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=(ev)=>{try{const d=JSON.parse(ev.target.result);if(!d.projects||!d.tasks){alert('Invalid backup.');return;}if(!confirm(`Replace all data with backup from ${new Date(d.exportedAt).toLocaleDateString()}?\n\n${d.projects.length} projects, ${d.tasks.length} tasks`))return;setProjects(d.projects);setTasks(d.tasks);setSources(d.sources||[]);setNotes(d.notes||[]);setProgress(d.progress||[]);setCustomTpls(d.customTpls||[]);setActiveProject(null);alert('Restored!');}catch{alert('Invalid file.');}};r.readAsText(f);};inp.click();};
+  const exportBackup=()=>{const d={projects,tasks,sources,notes,progress,customTpls,smPosts,exportedAt:new Date().toISOString(),version:5};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`commandpost-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(u);};
+  const importBackup=()=>{const inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=(e)=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=(ev)=>{try{const d=JSON.parse(ev.target.result);if(!d.projects||!d.tasks){alert('Invalid backup.');return;}if(!confirm(`Replace all data with backup from ${new Date(d.exportedAt).toLocaleDateString()}?\n\n${d.projects.length} projects, ${d.tasks.length} tasks`))return;setProjects(d.projects);setTasks(d.tasks);setSources(d.sources||[]);setNotes(d.notes||[]);setProgress(d.progress||[]);setCustomTpls(d.customTpls||[]);setSmPosts(d.smPosts||[]);setActiveProject(null);alert('Restored!');}catch{alert('Invalid file.');}};r.readAsText(f);};inp.click();};
 
   return(<><style>{css}</style><div className="app">
     <header className="topbar">
@@ -299,7 +331,9 @@ function Dashboard(){
           saveNote={n=>saveNote({...n,projectId:activeProject})} deleteNote={deleteNote}
           saveProgress={e=>saveProgress({...e,projectId:activeProject})} deleteProgress={deleteProgress}
           customTpls={customTpls.filter(t=>t.projectId===activeProject)}
-          saveCustomTpl={t=>saveCustomTpl({...t,projectId:activeProject})} deleteCustomTpl={deleteCustomTpl}/>}
+          saveCustomTpl={t=>saveCustomTpl({...t,projectId:activeProject})} deleteCustomTpl={deleteCustomTpl}
+          smPosts={smPosts.filter(p=>p.projectId===activeProject)}
+          saveSmPost={p=>saveSmPost({...p,projectId:activeProject})} deleteSmPost={deleteSmPost} togglePosted={togglePosted}/>}
       </main>
     </div>
     {showNewProject&&<NewProjectModal onSave={addProject} onClose={()=>setShowNewProject(false)}/>}
@@ -334,11 +368,12 @@ function GlobalOverview({projects,tasks,onSelect,onNew}){
 }
 
 // ━━━ PROJECT DASHBOARD ━━━
-function ProjectDashboard({project,tasks,sources,notes,progressEntries,onAddTask,onEditTask,toggleTask,deleteProject,togglePause,clearTasks,addSource,deleteSource,saveNote,deleteNote,saveProgress,deleteProgress,customTpls,saveCustomTpl,deleteCustomTpl}){
+function ProjectDashboard({project,tasks,sources,notes,progressEntries,onAddTask,onEditTask,toggleTask,deleteProject,togglePause,clearTasks,addSource,deleteSource,saveNote,deleteNote,saveProgress,deleteProgress,customTpls,saveCustomTpl,deleteCustomTpl,smPosts,saveSmPost,deleteSmPost,togglePosted}){
   const[tab,setTab]=useState("overview");const[calView,setCalView]=useState("week");const[currentDate,setCurrentDate]=useState(todayStr());
   const[filterCat,setFilterCat]=useState(null);const[srcUrl,setSrcUrl]=useState("");const[srcLabel,setSrcLabel]=useState("");
   const[editingNote,setEditingNote]=useState(null);const[viewingNote,setViewingNote]=useState(null);const[editingProg,setEditingProg]=useState(null);const[viewingTpl,setViewingTpl]=useState(null);
   const[noteTagFilter,setNoteTagFilter]=useState(null);const[progTagFilter,setProgTagFilter]=useState(null);const[tplCatFilter,setTplCatFilter]=useState(null);
+  const[smModal,setSmModal]=useState(null); // null | {mode:'add',date} | {mode:'edit',post} | {mode:'view',post}
 
   const td=todayStr();const done=tasks.filter(t=>t.done).length;const pending=tasks.filter(t=>!t.done).length;
   const overdue=tasks.filter(t=>!t.done&&t.date<td).length;const wkD=getWeekDates(td);const wkT=tasks.filter(t=>wkD.includes(t.date));
@@ -351,6 +386,7 @@ function ProjectDashboard({project,tasks,sources,notes,progressEntries,onAddTask
   const weekDates=getWeekDates(currentDate);const monthDates=getMonthDates(cY,cM);
   const fTasks=filterCat?tasks.filter(t=>t.category===filterCat):tasks;
   const getTasksForDate=useCallback(d=>fTasks.filter(t=>t.date===d),[fTasks]);
+  const getPostsForDate=useCallback(d=>smPosts.filter(p=>p.date===d),[smPosts]);
   const navW=(dir)=>{const d=new Date(currentDate+"T00:00:00");d.setDate(d.getDate()+dir*7);setCurrentDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);};
   const navM=(dir)=>{const d=new Date(cY,cM+dir,1);setCurrentDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);};
 
@@ -407,13 +443,15 @@ function ProjectDashboard({project,tasks,sources,notes,progressEntries,onAddTask
           <button className={`btn btn-sm ${calView==="week"?"btn-p":"btn-g"}`} onClick={()=>setCalView("week")}>Week</button>
           <button className={`btn btn-sm ${calView==="month"?"btn-p":"btn-g"}`} onClick={()=>setCalView("month")}>Month</button>
         </div>
+        <button className="btn btn-sm" style={{background:"#fdf2f8",color:"#be185d"}} onClick={()=>setSmModal({mode:"add",date:currentDate})}>{I.cam} SM Post</button>
         <button className="btn btn-d btn-sm" onClick={clearTasks}>{I.trash} Clear All</button>
         <div style={{marginLeft:"auto",display:"flex",gap:4,flexWrap:"wrap"}}>
           <button className={`chip-o ${!filterCat?"sel":""}`} onClick={()=>setFilterCat(null)} style={{fontSize:11,padding:"4px 10px"}}>All</button>
           {CATEGORIES.map(c=><button key={c.id} className={`chip-o ${filterCat===c.id?"sel":""}`} style={filterCat===c.id?{background:c.color,borderColor:c.color,fontSize:11,padding:"4px 10px"}:{fontSize:11,padding:"4px 10px"}} onClick={()=>setFilterCat(filterCat===c.id?null:c.id)}>{c.icon}</button>)}
         </div>
       </div>
-      {calView==="week"?<WeekCal weekDates={weekDates} getTasksForDate={getTasksForDate} navigate={navW} onAdd={onAddTask} onEdit={onEditTask} toggleTask={toggleTask} setCurrentDate={setCurrentDate}/>:<MonthCal monthDates={monthDates} currentMonth={cM} currentYear={cY} getTasksForDate={getTasksForDate} navigate={navM} onDayClick={d=>{setCurrentDate(d);setCalView("week");}}/>}
+      {calView==="week"?<WeekCal weekDates={weekDates} getTasksForDate={getTasksForDate} getPostsForDate={getPostsForDate} navigate={navW} onAdd={onAddTask} onEdit={onEditTask} toggleTask={toggleTask} setCurrentDate={setCurrentDate} onAddPost={d=>setSmModal({mode:"add",date:d})} onViewPost={p=>setSmModal({mode:"view",post:p})}/>:<MonthCal monthDates={monthDates} currentMonth={cM} currentYear={cY} getTasksForDate={getTasksForDate} getPostsForDate={getPostsForDate} navigate={navM} onDayClick={d=>{setCurrentDate(d);setCalView("week");}}/>}
+      {smModal&&<SmPostModal modal={smModal} onSave={p=>{saveSmPost(p);setSmModal(null);}} onDelete={id=>{deleteSmPost(id);setSmModal(null);}} onTogglePosted={id=>{togglePosted(id);setSmModal(null);}} onClose={()=>setSmModal(null)} onEdit={p=>setSmModal({mode:"edit",post:p})} color={project.color}/>}
     </div>}
 
     {/* TASKS */}
@@ -546,17 +584,23 @@ function GlobalMiniCal({tasks,projects}){
 }
 
 // ━━━ WEEK CAL ━━━
-function WeekCal({weekDates,getTasksForDate,navigate,onAdd,onEdit,toggleTask,setCurrentDate}){
+function WeekCal({weekDates,getTasksForDate,getPostsForDate,navigate,onAdd,onEdit,toggleTask,setCurrentDate,onAddPost,onViewPost}){
   const d=new Date(weekDates[0]+"T00:00:00");
   return(<div><div className="cal-head"><div><div className="cal-title">{MONTHS[d.getMonth()]} {d.getFullYear()}</div><div className="cal-sub">{fmtDate(weekDates[0])} — {fmtDate(weekDates[6])}</div></div><div className="cal-navs"><button className="btn-icon" onClick={()=>setCurrentDate(todayStr())} style={{fontSize:11,fontWeight:600,width:"auto",padding:"0 10px"}}>Today</button><button className="btn-icon" onClick={()=>navigate(-1)}>‹</button><button className="btn-icon" onClick={()=>navigate(1)}>›</button></div></div>
-    <div className="week-grid">{weekDates.map((date,i)=>{const dt=getTasksForDate(date);const dd=new Date(date+"T00:00:00");return(<div key={date} className={`w-col ${isToday(date)?"today":""}`}><div className="w-day">{DAYS[i]}</div><div className="w-num">{dd.getDate()}</div><div className="w-tasks">{dt.map(t=>{const c=CATEGORIES.find(x=>x.id===t.category);return<div key={t.id} className={`tc ${t.done?"done":""}`} style={{background:c?c.color+"12":"var(--s2)"}} onClick={()=>onEdit(t)}><span className={`tc-chk ${t.done?"checked":""}`} style={{borderColor:c?.color,background:t.done?c?.color:"transparent"}} onClick={e=>{e.stopPropagation();toggleTask(t.id);}}>{t.done&&<span style={{color:"#fff",fontSize:8}}>✓</span>}</span><span className="tc-txt">{t.title}</span></div>;})}</div><button className="w-add" onClick={()=>onAdd(date)}>{I.plus}</button></div>);})}</div>
+    <div className="week-grid">{weekDates.map((date,i)=>{const dt=getTasksForDate(date);const posts=getPostsForDate(date);const dd=new Date(date+"T00:00:00");return(<div key={date} className={`w-col ${isToday(date)?"today":""}`}><div className="w-day">{DAYS[i]}</div><div className="w-num">{dd.getDate()}</div><div className="w-tasks">{dt.map(t=>{const c=CATEGORIES.find(x=>x.id===t.category);return<div key={t.id} className={`tc ${t.done?"done":""}`} style={{background:c?c.color+"12":"var(--s2)"}} onClick={()=>onEdit(t)}><span className={`tc-chk ${t.done?"checked":""}`} style={{borderColor:c?.color,background:t.done?c?.color:"transparent"}} onClick={e=>{e.stopPropagation();toggleTask(t.id);}}>{t.done&&<span style={{color:"#fff",fontSize:8}}>✓</span>}</span><span className="tc-txt">{t.title}</span></div>;})}
+        {posts.map(p=><div key={p.id} className="sm-chip" style={{opacity:p.posted?.5:1}} onClick={()=>onViewPost(p)}>
+          {p.image?<img src={p.image} className="sm-chip-img" alt=""/>:I.cam}
+          <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.platform}</span>
+          {p.posted&&<span style={{fontSize:8}}>✓</span>}
+        </div>)}
+      </div><button className="w-add" onClick={()=>onAdd(date)}>{I.plus}</button></div>);})}</div>
   </div>);
 }
 
 // ━━━ MONTH CAL ━━━
-function MonthCal({monthDates,currentMonth,currentYear,getTasksForDate,navigate,onDayClick}){
+function MonthCal({monthDates,currentMonth,currentYear,getTasksForDate,getPostsForDate,navigate,onDayClick}){
   return(<div><div className="cal-head"><div><div className="cal-title">{MONTHS[currentMonth]} {currentYear}</div><div className="cal-sub">Click day → week view</div></div><div className="cal-navs"><button className="btn-icon" onClick={()=>navigate(-1)}>‹</button><button className="btn-icon" onClick={()=>navigate(1)}>›</button></div></div>
-    <div className="month-grid">{DAYS.map(d=><div key={d} className="m-hdr">{d}</div>)}{monthDates.map((date,i)=>{const dd=new Date(date+"T00:00:00");const isO=dd.getMonth()!==currentMonth;const dt=getTasksForDate(date);return<div key={i} className={`m-cell ${isO?"other":""} ${isToday(date)?"today":""}`} onClick={()=>onDayClick(date)}><div className="m-num">{dd.getDate()}</div>{dt.slice(0,3).map(t=>{const c=CATEGORIES.find(x=>x.id===t.category);return<div key={t.id} className="m-dot" style={{background:c?.color||"#78716c",opacity:t.done?.4:1}}>{t.title}</div>;})}{dt.length>3&&<div style={{font:"400 9px/1 var(--font)",color:"var(--t3)",padding:"0 4px"}}>+{dt.length-3}</div>}</div>;})}</div>
+    <div className="month-grid">{DAYS.map(d=><div key={d} className="m-hdr">{d}</div>)}{monthDates.map((date,i)=>{const dd=new Date(date+"T00:00:00");const isO=dd.getMonth()!==currentMonth;const dt=getTasksForDate(date);const posts=getPostsForDate(date);return<div key={i} className={`m-cell ${isO?"other":""} ${isToday(date)?"today":""}`} onClick={()=>onDayClick(date)}><div className="m-num">{dd.getDate()}</div>{dt.slice(0,2).map(t=>{const c=CATEGORIES.find(x=>x.id===t.category);return<div key={t.id} className="m-dot" style={{background:c?.color||"#78716c",opacity:t.done?.4:1}}>{t.title}</div>;})}{posts.slice(0,1).map(p=><div key={p.id} className="m-dot" style={{background:"#ec4899",opacity:p.posted?.4:1}}>📸 {p.platform}</div>)}{(dt.length+posts.length)>3&&<div style={{font:"400 9px/1 var(--font)",color:"var(--t3)",padding:"0 4px"}}>+{dt.length+posts.length-3}</div>}</div>;})}</div>
   </div>);
 }
 
@@ -592,6 +636,98 @@ function TaskModal({modal,projects,activeProject,onSave,onDelete,onClose}){
       <div className="btn-row">{isE&&<button className="btn btn-d" onClick={()=>{onDelete(modal.task.id);onClose();}} style={{marginRight:"auto"}}>{I.trash} Delete</button>}<button className="btn btn-g" onClick={onClose}>Cancel</button><button className="btn btn-p" disabled={!f.title.trim()||!f.date||!f.projectId} onClick={()=>onSave({...(isE?modal.task:{}),...f})}>{isE?"Update":"Create"}</button></div>
     </div>
   </div></div>);
+}
+
+// ━━━ SM POST MODAL ━━━
+function SmPostModal({modal,onSave,onDelete,onTogglePosted,onClose,onEdit,color}){
+  const isView=modal.mode==="view";
+  const isEdit=modal.mode==="edit";
+  const post=modal.post||{};
+
+  const[platform,setPlatform]=useState(post.platform||"Instagram");
+  const[caption,setCaption]=useState(post.caption||"");
+  const[hashtags,setHashtags]=useState(post.hashtags||"");
+  const[image,setImage]=useState(post.image||null);
+  const[date,setDate]=useState(post.date||modal.date||todayStr());
+  const[notes,setNotes]=useState(post.notes||"");
+  const[loading,setLoading]=useState(false);
+
+  const handleImage=async(e)=>{
+    const file=e.target.files[0];if(!file)return;
+    setLoading(true);
+    const compressed=await compressImage(file);
+    setImage(compressed);setLoading(false);
+  };
+
+  const handleDownload=()=>{
+    if(!post.image)return;
+    const a=document.createElement('a');a.href=post.image;
+    a.download=`${post.platform}-${post.date}.jpg`;a.click();
+  };
+
+  const handleCopyCaption=()=>{
+    const text=[post.caption,post.hashtags].filter(Boolean).join("\n\n");
+    navigator.clipboard.writeText(text);alert("Caption & hashtags copied!");
+  };
+
+  // View mode
+  if(isView)return(
+    <div className="modal-ov" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()} style={{width:520}}>
+      <div className="modal-h">
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span className="modal-t">{post.platform} Post</span>
+          <span style={{font:"500 10px/1 var(--font)",padding:"3px 8px",borderRadius:10,background:post.posted?"#dcfce7":"#fdf2f8",color:post.posted?"#16a34a":"#be185d"}}>{post.posted?"Posted":"Scheduled"}</span>
+        </div>
+        <button className="modal-x" onClick={onClose}>{I.close}</button>
+      </div>
+      <div className="modal-b" style={{gap:16}}>
+        {post.image&&<div className="sm-post-preview"><img src={post.image} alt="Post"/></div>}
+        {post.caption&&<div style={{font:"400 14px/1.6 var(--font)",color:"var(--text)",whiteSpace:"pre-wrap"}}>{post.caption}</div>}
+        {post.hashtags&&<div style={{font:"400 13px/1.5 var(--font)",color:"#2563eb",whiteSpace:"pre-wrap"}}>{post.hashtags}</div>}
+        {post.notes&&<div style={{font:"400 12px/1.4 var(--font)",color:"var(--t3)",borderTop:"1px solid var(--border-s)",paddingTop:10}}>{post.notes}</div>}
+        <div style={{font:"400 11px/1 var(--font)",color:"var(--t3)"}}>Scheduled: {fmtDate(post.date)}</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid var(--border-s)",paddingTop:12}}>
+          <button className="btn btn-d btn-sm" onClick={()=>onDelete(post.id)}>{I.trash}</button>
+          <button className="btn btn-sm" style={{background:post.posted?"#fffbeb":"#dcfce7",color:post.posted?"#d97706":"#16a34a"}} onClick={()=>onTogglePosted(post.id)}>{post.posted?"Mark Unposted":"Mark Posted ✓"}</button>
+          <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+            {post.image&&<button className="btn btn-g btn-sm" onClick={handleDownload}>{I.download} Image</button>}
+            <button className="btn btn-g btn-sm" onClick={handleCopyCaption}>Copy Caption</button>
+            <button className="btn btn-p btn-sm" onClick={()=>onEdit(post)}>Edit</button>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  );
+
+  // Add / Edit mode
+  return(
+    <div className="modal-ov" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()} style={{width:520}}>
+      <div className="modal-h"><span className="modal-t">{isEdit?"Edit SM Post":"New SM Post"}</span><button className="modal-x" onClick={onClose}>{I.close}</button></div>
+      <div className="modal-b" style={{gap:14}}>
+        <div className="field"><label className="fl">Platform</label>
+          <div className="chip-sel">{PLATFORMS.map(p=><button key={p} className={`chip-o ${platform===p?"sel":""}`} onClick={()=>setPlatform(p)}>{p}</button>)}</div>
+        </div>
+        <div className="field"><label className="fl">Date</label><input className="fi" type="date" value={date} onChange={e=>setDate(e.target.value)}/></div>
+        <div className="field"><label className="fl">Image</label>
+          {image?<div style={{position:"relative"}}>
+            <img src={image} style={{width:"100%",borderRadius:8,display:"block"}} alt="Preview"/>
+            <button className="btn btn-d btn-sm" style={{position:"absolute",top:8,right:8}} onClick={()=>setImage(null)}>{I.close} Remove</button>
+          </div>:<label style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,padding:24,border:"2px dashed var(--s3)",borderRadius:8,cursor:"pointer",color:"var(--t3)",transition:"var(--tr)"}}>
+            {loading?<span>Compressing...</span>:<><span style={{fontSize:24}}>📸</span><span style={{font:"400 13px/1 var(--font)"}}>Click to upload image</span><span style={{font:"400 11px/1 var(--font)",color:"var(--t4)"}}>Auto-compressed to save space</span></>}
+            <input type="file" accept="image/*" onChange={handleImage} style={{display:"none"}}/>
+          </label>}
+        </div>
+        <div className="field"><label className="fl">Caption</label><textarea className="fi" placeholder="Write your post caption..." value={caption} onChange={e=>setCaption(e.target.value)} style={{minHeight:80}}/></div>
+        <div className="field"><label className="fl">Hashtags</label><input className="fi" placeholder="#marketing #seo #growthhacking" value={hashtags} onChange={e=>setHashtags(e.target.value)}/></div>
+        <div className="field"><label className="fl">Notes (private, won't be copied)</label><input className="fi" placeholder="Internal notes..." value={notes} onChange={e=>setNotes(e.target.value)}/></div>
+        <div className="btn-row">
+          {isEdit&&<button className="btn btn-d btn-sm" onClick={()=>onDelete(post.id)} style={{marginRight:"auto"}}>{I.trash}</button>}
+          <button className="btn btn-g" onClick={onClose}>Cancel</button>
+          <button className="btn btn-p" disabled={!platform||!date} onClick={()=>onSave({...(isEdit?post:{}),platform,caption,hashtags,image,date,notes})}>{isEdit?"Update":"Schedule Post"}</button>
+        </div>
+      </div>
+    </div></div>
+  );
 }
 
 // ━━━ TEMPLATES TAB ━━━
